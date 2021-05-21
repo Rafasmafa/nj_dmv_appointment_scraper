@@ -95,6 +95,6 @@ class NjDmvScraper:
         options.add_argument('--headless')
         return webdriver.Chrome(chrome_driver_path, options=options)
 
-cities = ['vineland', 'newark', 'wayne']
-months = ['May', 'June', 'July']
+cities = ['vineland', 'newark']
+months = ['May', 'June']
 NjDmvScraper(cities, months).run()
