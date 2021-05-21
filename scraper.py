@@ -17,12 +17,15 @@ class NjDmvScraper:
         self.driver = self._setup_chromedriver()
         phone_number = os.getenv("PHONE_NUMBER")
         self.phone_email = f"{phone_number}@vtext.com"
+        self.found_appts = {}
+        for city in cities:
+            self.found_appts[city] = []
 
     def run(self):
         while True:
             try:
                 self.check_open_appointments(quit_when_done=False)
-                time.sleep(60)
+                time.sleep(5)
             except Exception:
                 self.driver.quit()
 
@@ -39,9 +42,10 @@ class NjDmvScraper:
                 if city_regex and "Next Available:" in city_node.text:
                     current_city = city_regex.group(0)[:-1].lower()
                     appt_dt = self.get_next_appt_dt(city_node.text)
-                    if city == current_city and appt_dt.strftime("%B") in self.search_months:
+                    if self._is_valid_appointment(city, current_city, appt_dt):
                         print (f'FOUND APPOINTMENT: {city.title()}', flush=True)
                         city_node.find_element_by_link_text("MAKE APPOINTMENT").click()
+                        self.found_appts[city].append(appt_dt)
                         time.sleep(2)  # wait for page to load
                         self.send_message(current_city.title(),
                                         appt_dt.strftime("%m/%d/%Y %I:%M %p"),
@@ -49,6 +53,11 @@ class NjDmvScraper:
                         break
         if quit_when_done:
             self.driver.quit()
+
+    def _is_valid_appointment(self, city1, city2, appt_dt):
+        return (city1 == city2 and \
+                appt_dt.strftime("%B") in self.search_months and \
+                appt_dt not in self.found_appts[city1])
 
     def get_next_appt_dt(self, city_node_text):
         regex = r"(?<=Next Available:\s).+(?=\sMAKE APPOINTMENT)"
@@ -86,6 +95,6 @@ class NjDmvScraper:
         options.add_argument('--headless')
         return webdriver.Chrome(chrome_driver_path, options=options)
 
-cities = ['newark', 'wayne']
-months = ['May', 'June'], 
+cities = ['vineland', 'newark', 'wayne']
+months = ['May', 'June', 'July']
 NjDmvScraper(cities, months).run()
