@@ -6,6 +6,7 @@ import smtplib
 from datetime import datetime
 from selenium import webdriver
 from drivers.driver_path import chrome_driver_path
+from twilio.rest import Client
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -30,8 +31,13 @@ class NjDmvScraper:
         self.search_months = search_months
         self.base_url = 'https://telegov.njportal.com/njmvc/AppointmentWizard/7'
         self.driver = self._setup_chromedriver()
-        phone_number = os.getenv("PHONE_NUMBER")
-        self.phone_email = f"{phone_number}@vtext.com"
+        self.phone_number = os.getenv("PHONE_NUMBER")
+        account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+        auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+        self.twilio_client = Client(account_sid, auth_token)
+        if not self.phone_number or not account_sid or not auth_token:
+            raise Exception('Ensure the following env vars are defined PHONE_NUMBER, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN')
+        self.phone_email = f"{self.phone_number}@vtext.com"
         self.found_appts = {}
         for city in cities:
             self.found_appts[city] = []
@@ -43,7 +49,7 @@ class NjDmvScraper:
         while True:
             try:
                 self.check_open_appointments(quit_when_done=False)
-                time.sleep(60)
+                time.sleep(30)
             except Exception:
                 self.driver.quit()
 
@@ -127,11 +133,18 @@ class NjDmvScraper:
             date: date of the appointment.
             link: link to the appointment.
         '''
+        body = (f"Open appointment in {city_name} on {date} \n {link}")
+        self.twilio_client.messages \
+                .create(
+                     body=body,
+                     from_='+15184788066',
+                     to='+1' + self.phone_number
+                )
+
         msg = MIMEMultipart()
         msg['From'] = os.environ.get('GMAIL')
         msg['To'] = self.phone_email
         msg['Subject'] = 'OPEN DMV APPOINTMENT'
-        body = (f"Open appointment in {city_name} on {date} \n {link}")
         msg.attach(MIMEText(body, 'html'))
 
         # creates SMTP session
@@ -152,6 +165,8 @@ class NjDmvScraper:
         # terminating the session
         s.quit()
 
+
+
     def _setup_chromedriver(self):
         '''
         Setup and init chrome driver.
@@ -161,6 +176,7 @@ class NjDmvScraper:
         return webdriver.Chrome(chrome_driver_path, options=options)
 
 if __name__ == "__main__":
-    cities = ['newark', 'wayne']
-    months = ['May', 'June']
-    NjDmvScraper(cities, months).run()
+    cities = ['wayne']
+    months = ['June', 'July']
+    scraper = NjDmvScraper(cities, months)
+    scraper.run()
