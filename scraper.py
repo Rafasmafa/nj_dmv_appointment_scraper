@@ -16,12 +16,12 @@ from selenium.webdriver.chrome.options import Options
 
 class NjDmvScraper:
     """
-    This class scapes the NJ dmv appointment website for OUT OF STATE
-    LICENSE TRANSERS ONLY. To check for other appointments change self.base_url
+    This class scrapes the NJ dmv appointment website for OUT OF STATE
+    LICENSE TRANSFERS ONLY. To check for other appointments change self.base_url
 
     Parameters:
-        cities: list of cities to check appointents for. (ex:['newark', 'wayne'] )
-        serach_month: list of months to check for open appointments. (ex:['May', 'June'] )
+        cities: list of cities to check appointments for. (ex:['newark', 'wayne'] )
+        search_months: list of months to check for open appointments. (ex:['May', 'June'] )
 
     Environment Variables:
         PHONE_NUMBER: a phone number to send texts to.
@@ -50,20 +50,16 @@ class NjDmvScraper:
         """
         while True:
             try:
-                self.check_open_appointments(quit_when_done=False)
+                self.check_open_appointments()
                 time.sleep(30)
             except Exception:
                 print(traceback.format_exc())
                 self.chrome_driver.quit()
 
-    def check_open_appointments(self, quit_when_done: bool = True):
+    def check_open_appointments(self):
         """
-        Checks base url for open appointments within the given cities and months
+        Checks base url for open appointments within the cities and months
         that were given in the constructor.
-
-        Parameters:
-            quit_when_done: close chrome driver when execution is finished
-
         """
         for city in self.cities:
             self.chrome_driver.get(self.base_url)
@@ -85,34 +81,27 @@ class NjDmvScraper:
                                           appt_dt.strftime("%m/%d/%Y %I:%M %p"),
                                           self.chrome_driver.current_url)
                         break
-        if quit_when_done:
-            self.chrome_driver.quit()
 
-    def _is_valid_appointment(self, city: str, appt_dt: datetime):
+    def _is_valid_appointment(self, city: str, appt_dt: datetime) -> bool:
         """
         Helper function to determine the appointment date is in the search_months
         and if we have already found the appointment
 
         Parameters:
+            city: a city name
             appt_dt: appointment datetime object
-
-        Return: bool
-
         """
         return (appt_dt.strftime("%B") in self.search_months and
                 appt_dt not in self.found_appts.get(city, []))
 
     @staticmethod
-    def get_next_appt_dt(city_node_text: str):
+    def get_next_appt_dt(city_node_text: str) -> datetime:
         """
         Parse out date from city node text using %m/%d/%Y %I:%M %p"
-        pattern and convert it to a datetie object
+        pattern and convert it to a datetime object
 
         Parameters:
             city_node_text: text from the city node html
-
-        Return: datetime
-
         """
         regex = r"(?<=Next Available:\s).+(?=\sMAKE APPOINTMENT)"
         dt_string = re.search(regex, city_node_text).group(0)
@@ -120,15 +109,9 @@ class NjDmvScraper:
 
     def send_message(self, city_name: str, date: str, link: str):
         """
-        Sends a text message to the verizon phone number given
-        in the environment variable PHONE_NUMBER by sending an
-        email from the gmail account specified using the
-        environment variables GMAIL and GMAil_PASSWORD.
+        Sends a text message to the phone number given set the environment variable PHONE_NUMBER.
 
-        Note: you can only send emails to a phone number if its a
-        verizon phone number.
-
-         Parameters:
+        Parameters:
             city_name: city name of the appointment.
             date: date of the appointment.
             link: link to the appointment.
@@ -137,7 +120,7 @@ class NjDmvScraper:
         self.twilio_client.messages.create(body=body, from_='+18166242060', to='+1' + self.phone_number)
 
     @cached_property
-    def chrome_driver(self):
+    def chrome_driver(self) -> webdriver.Chrome:
         """Setup and init chromedriver."""
         chrome_options = Options()
         chrome_options.add_argument("--headless")
@@ -147,6 +130,6 @@ class NjDmvScraper:
 
 if __name__ == "__main__":
     cities = ['wayne']
-    months = ['April']
+    months = ['April', 'May']
     scraper = NjDmvScraper(cities, months)
     scraper.run()
